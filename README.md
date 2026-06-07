@@ -1,6 +1,6 @@
 # portableweb-sandbox
 
-**Experimental** isolated bundle execution origin for [portableweb-studio](https://github.com/portableweb-studio/portableweb-studio.github.io).
+**Experimental** isolated bundle execution origin for [portableweb-viewer](https://github.com/portableweb-viewer/portableweb-viewer.github.io).
 
 > **Official live site:** [portableweb.org](https://portableweb.org) / [portableweb.github.io](https://github.com/portableweb/portableweb.github.io)
 >
@@ -12,7 +12,7 @@
 
 `.pweb` bundles are user-supplied HTML/CSS/JS. To prevent a bundle from accessing the viewer's storage, DOM, or APIs, bundles must run on a **different origin** from the viewer app.
 
-`portableweb-sandbox.github.io` is that origin. The viewer app (`portableweb-studio.github.io`) opens bundles here in a popup. Because the two origins are different, the browser enforces a hard security boundary between them:
+`portableweb-sandbox.github.io` is that origin. The viewer app (`portableweb-viewer.github.io`) opens bundles here in a popup. Because the two origins are different, the browser enforces a hard security boundary between them:
 
 - Bundle JS cannot read or write the studio's localStorage, IndexedDB, or cookies
 - Bundle JS cannot access the studio's `window` object or DOM
@@ -21,7 +21,7 @@
 ## How it works
 
 ```
-portableweb-studio.github.io/app/         portableweb-sandbox.github.io/
+portableweb-viewer.github.io/app/         portableweb-sandbox.github.io/
 ───────────────────────────────────       ────────────────────────────────
 User opens .pweb file                     popup: /portal.html?s=<sessionId>
   ↓                                         ↓
@@ -65,6 +65,6 @@ Enable Pages in repo settings: **Source → Deploy from branch → main → / (r
 
 ## Related
 
-- [portableweb-studio](https://github.com/portableweb-studio/portableweb-studio.github.io) — experimental viewer app that uses this sandbox origin
+- [portableweb-viewer](https://github.com/portableweb-viewer/portableweb-viewer.github.io) — experimental viewer app that uses this sandbox origin
 - [portableweb/portableweb.github.io](https://github.com/portableweb/portableweb.github.io) — official live site
 - [portableweb.org](https://portableweb.org) — official domain
