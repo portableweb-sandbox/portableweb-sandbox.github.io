@@ -1,13 +1,11 @@
 /* portableweb-sandbox — isolated bundle execution origin
-   Part of the portableweb-studio experimental security setup.
-   Official viewer: https://portableweb-studio.github.io/app/
-   Official live site: https://portableweb.org */
+   Served from sandbox.portableweb.org — cross-origin from the viewer at
+   portableweb.org, providing hard browser-enforced isolation for bundle JS. */
 
-const CACHE = 'pweb-sandbox-v1';
+const CACHE = 'pweb-sandbox-v2';
 const STORE = 'bundle-files';
 
 const SHELL = [
-  '/',
   '/portal.html',
   '/install.html',
 ];
@@ -70,7 +68,12 @@ self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
 
   const url = new URL(e.request.url);
-  if (url.origin !== self.location.origin) return;
+
+  /* Block all external network access — bundles are self-contained. */
+  if (url.origin !== self.location.origin) {
+    e.respondWith(Promise.reject(new TypeError('Network access blocked by sandbox')));
+    return;
+  }
 
   /* Bundle files: /bundle/<sessionId>/<path> — served from per-session IDB */
   const bundleMatch = url.pathname.match(/^\/bundle\/([^/]+)\/(.*)/);

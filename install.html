@@ -11,7 +11,7 @@
        Posts 'sw-ready' to the parent window when the SW is active and
        controlling this page. Non-blocking — failures still post sw-ready
        so the studio does not hang. */
-    const STUDIO_ORIGIN = 'https://portableweb-viewer.github.io';
+    const STUDIO_ORIGIN = 'https://portableweb.org';
 
     function done() {
       window.parent.postMessage('sw-ready', STUDIO_ORIGIN);

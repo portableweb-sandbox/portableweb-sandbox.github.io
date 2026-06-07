@@ -22,7 +22,7 @@
 <body>
   <div id="msg">Opening bundle…</div>
   <script>
-    const STUDIO_ORIGIN = 'https://portableweb-viewer.github.io';
+    const STUDIO_ORIGIN = 'https://portableweb.org';
     const s = new URLSearchParams(location.search).get('s');
 
     function showError(msg) {
@@ -50,10 +50,8 @@
           }
         }
 
-        /* Signal the studio that this portal is ready to receive bundle files */
-        if (window.opener) {
-          window.opener.postMessage({ type: 'portal-ready', sessionId: s }, STUDIO_ORIGIN);
-        }
+        /* Signal the viewer that this portal is ready to receive bundle files */
+        window.parent.postMessage({ type: 'portal-ready', sessionId: s }, STUDIO_ORIGIN);
 
         /* Receive bundle files from the studio via cross-origin postMessage */
         window.addEventListener('message', async (e) => {
