@@ -5,22 +5,35 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Opening bundle…</title>
   <style>
-    html, body {
-      margin: 0; height: 100%;
-      background: #08080f;
-      color: #9090c0;
-      font-family: ui-sans-serif, system-ui, sans-serif;
-      font-size: 14px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #08080f; }
+    #msg {
+      position: fixed; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      color: #9090c0; font-family: ui-sans-serif, system-ui, sans-serif;
+      font-size: 14px; text-align: center; line-height: 1.6;
     }
-    #msg { text-align: center; line-height: 1.6; max-width: 400px; padding: 1rem; }
+    #msg.hidden { display: none; }
     .err { color: #f87171; }
+    /* Inner iframe fills the whole portal — bundle renders here.
+       sandbox="allow-scripts": bundle JS runs but gets a null (opaque) origin.
+       Null origin means the browser itself blocks: IDB, SW registration,
+       localStorage, cookies — no HTML injection needed. */
+    #bundle-frame {
+      position: fixed; inset: 0;
+      width: 100%; height: 100%; border: 0;
+      display: none;
+    }
+    #bundle-frame.ready { display: block; }
   </style>
 </head>
 <body>
   <div id="msg">Opening bundle…</div>
+  <iframe id="bundle-frame"
+    sandbox="allow-scripts"
+    title="Bundle content"
+    src="about:blank">
+  </iframe>
+
   <script>
     const STUDIO_ORIGIN = 'https://portableweb.org';
     const s = new URLSearchParams(location.search).get('s');
@@ -33,9 +46,8 @@
       showError('Invalid session — open bundles via the PortableWeb viewer.');
     } else {
       async function init() {
-        /* Register and wait for the sandbox SW to control this page.
-           Required so that /bundle/<id>/* navigation requests are
-           intercepted and served from IndexedDB rather than the network. */
+        /* Register sandbox SW and wait for it to control this page.
+           The SW serves /bundle/<sessionId>/* from IDB into the inner iframe. */
         if ('serviceWorker' in navigator) {
           try {
             await navigator.serviceWorker.register('/sw.js');
@@ -50,10 +62,10 @@
           }
         }
 
-        /* Signal the viewer that this portal is ready to receive bundle files */
+        /* Signal the viewer that the portal is ready to receive bundle files */
         window.parent.postMessage({ type: 'portal-ready', sessionId: s }, STUDIO_ORIGIN);
 
-        /* Receive bundle files from the studio via cross-origin postMessage */
+        /* Receive bundle files from the viewer via cross-origin postMessage */
         window.addEventListener('message', async (e) => {
           if (e.origin !== STUDIO_ORIGIN) return;
 
@@ -65,9 +77,8 @@
           if (e.data?.type !== 'bundle-files' || e.data?.sessionId !== s) return;
 
           try {
-            /* Store all files in the per-session IndexedDB database.
-               This DB lives on portableweb-sandbox.github.io — fully isolated
-               from the studio and from other bundle sessions. */
+            /* Store all files in the per-session IDB database on this origin.
+               Fully isolated from the viewer and from other bundle sessions. */
             const db = await new Promise((resolve, reject) => {
               const req = indexedDB.open('portableweb-' + s, 1);
               req.onupgradeneeded = () => req.result.createObjectStore('bundle-files');
@@ -86,9 +97,17 @@
             });
             db.close();
 
-            /* Navigate to the bundle entry point — SW intercepts this request
-               and serves the file from IDB, injecting the security guard first. */
-            location.replace('/bundle/' + s + '/' + e.data.entry);
+            /* Point the inner sandboxed iframe at the bundle entry.
+               The SW intercepts this request and serves from IDB.
+               sandbox="allow-scripts" gives the inner frame a null (opaque)
+               origin — the browser blocks IDB, SW, localStorage and cookies
+               without any HTML manipulation. */
+            const frame = document.getElementById('bundle-frame');
+            frame.src = '/bundle/' + s + '/' + e.data.entry;
+            frame.addEventListener('load', () => {
+              document.getElementById('msg').classList.add('hidden');
+              frame.classList.add('ready');
+            }, { once: true });
           } catch (err) {
             showError('Failed to store bundle: ' + err.message);
           }
