@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Opening bundle…</title>
+  <style>
+    html, body {
+      margin: 0; height: 100%;
+      background: #08080f;
+      color: #9090c0;
+      font-family: ui-sans-serif, system-ui, sans-serif;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #msg { text-align: center; line-height: 1.6; max-width: 400px; padding: 1rem; }
+    .err { color: #f87171; }
+  </style>
+</head>
+<body>
+  <div id="msg">Opening bundle…</div>
+  <script>
+    const STUDIO_ORIGIN = 'https://portableweb-studio.github.io';
+    const s = new URLSearchParams(location.search).get('s');
+
+    function showError(msg) {
+      document.getElementById('msg').innerHTML = '<span class="err">' + msg + '</span>';
+    }
+
+    if (!s) {
+      showError('Invalid session — open bundles via the PortableWeb viewer.');
+    } else {
+      async function init() {
+        /* Register and wait for the sandbox SW to control this page.
+           Required so that /bundle/<id>/* navigation requests are
+           intercepted and served from IndexedDB rather than the network. */
+        if ('serviceWorker' in navigator) {
+          try {
+            await navigator.serviceWorker.register('/sw.js');
+            if (!navigator.serviceWorker.controller) {
+              await new Promise(r =>
+                navigator.serviceWorker.addEventListener('controllerchange', r, { once: true })
+              );
+            }
+          } catch (e) {
+            showError('Service worker registration failed: ' + e.message);
+            return;
+          }
+        }
+
+        /* Signal the studio that this portal is ready to receive bundle files */
+        if (window.opener) {
+          window.opener.postMessage({ type: 'portal-ready', sessionId: s }, STUDIO_ORIGIN);
+        }
+
+        /* Receive bundle files from the studio via cross-origin postMessage */
+        window.addEventListener('message', async (e) => {
+          if (e.origin !== STUDIO_ORIGIN) return;
+
+          if (e.data?.type === 'error') {
+            showError('Could not open bundle: ' + e.data.message);
+            return;
+          }
+
+          if (e.data?.type !== 'bundle-files' || e.data?.sessionId !== s) return;
+
+          try {
+            /* Store all files in the per-session IndexedDB database.
+               This DB lives on portableweb-sandbox.github.io — fully isolated
+               from the studio and from other bundle sessions. */
+            const db = await new Promise((resolve, reject) => {
+              const req = indexedDB.open('portableweb-' + s, 1);
+              req.onupgradeneeded = () => req.result.createObjectStore('bundle-files');
+              req.onsuccess = () => resolve(req.result);
+              req.onerror = () => reject(req.error);
+            });
+
+            const tx = db.transaction('bundle-files', 'readwrite');
+            const store = tx.objectStore('bundle-files');
+            for (const { path, mime, data } of e.data.entries) {
+              store.put({ data: new Uint8Array(data), mime }, path);
+            }
+            await new Promise((resolve, reject) => {
+              tx.oncomplete = resolve;
+              tx.onerror = () => reject(tx.error);
+            });
+            db.close();
+
+            /* Navigate to the bundle entry point — SW intercepts this request
+               and serves the file from IDB, injecting the security guard first. */
+            location.replace('/bundle/' + s + '/' + e.data.entry);
+          } catch (err) {
+            showError('Failed to store bundle: ' + err.message);
+          }
+        });
+      }
+
+      init().catch(e => showError(e.message));
+    }
+  </script>
+</body>
+</html>

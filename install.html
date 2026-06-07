@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>PortableWeb Sandbox</title>
+</head>
+<body>
+  <script>
+    /* Loaded in a hidden iframe by portableweb-studio to pre-install the
+       sandbox service worker before the user opens their first bundle.
+       Posts 'sw-ready' to the parent window when the SW is active and
+       controlling this page. Non-blocking — failures still post sw-ready
+       so the studio does not hang. */
+    const STUDIO_ORIGIN = 'https://portableweb-studio.github.io';
+
+    function done() {
+      window.parent.postMessage('sw-ready', STUDIO_ORIGIN);
+    }
+
+    if (!('serviceWorker' in navigator)) {
+      done();
+    } else {
+      navigator.serviceWorker.register('/sw.js')
+        .then(reg => {
+          if (reg.active) { done(); return; }
+          const sw = reg.installing || reg.waiting;
+          if (sw) {
+            sw.addEventListener('statechange', function () {
+              if (this.state === 'activated') done();
+            });
+          }
+        })
+        .catch(done);
+    }
+  </script>
+</body>
+</html>
